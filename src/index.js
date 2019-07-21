@@ -23,15 +23,26 @@ const GET_REPOSITORIES_OF_ORGANIZATION = gql`
     organization(login: $organization) {
       name
       url
-      repositories(first: 5) {
+      repositories(
+        first: 5
+        orderBy: { direction: DESC, field: STARGAZERS }
+      ) {
         edges {
           node {
-            name
-            url
+            ...sharedRepositoryFields
           }
+        }
+        pageInfo {
+          endCursor
+          hasNextPage
         }
       }
     }
+  }
+
+  fragment sharedRepositoryFields on Repository {
+    name
+    url
   }
 `;
 
@@ -51,15 +62,50 @@ client
     query: GET_REPOSITORIES_OF_ORGANIZATION,
     variables: {
       organization: 'the-road-to-learn-react',
+      cursor: undefined,
     },
   })
-  .then(console.log);
+  // resolve first page
+  .then(result => {
+    const { pageInfo, edges } = result.data.organization.repositories;
+    const { endCursor, hasNextPage } = pageInfo;
+
+    console.log('second page', edges.length);
+    console.log('endCursor', endCursor);
+
+    return pageInfo;
+  })
+  // query second page
+  .then(({ endCursor, hasNextPage }) => {
+    if (!hasNextPage) {
+      throw Error('no next page');
+    }
+
+    return client.query({
+      query: GET_REPOSITORIES_OF_ORGANIZATION,
+      variables: {
+        organization: 'the-road-to-learn-react',
+        cursor: endCursor,
+      },
+    });
+  })
+  // resolve second page
+  .then(result => {
+    const { pageInfo, edges } = result.data.organization.repositories;
+    const { endCursor, hasNextPage } = pageInfo;
+
+    console.log('second page', edges.length);
+    console.log('endCursor', endCursor);
+
+    return pageInfo;
+  })
+  .catch(console.log);
 
 client
   .mutate({
     mutation: ADD_STAR,
     variables: {
-      repositoryId: 'MDEw0lJlcG9zaXRvcnk2MzM1MjkwNw==',
+      repositoryId: 'MDEwOlJlcG9zaXRvcnk2MzM1MjkwNw==',
     },
   })
   .then(console.log);
@@ -71,4 +117,4 @@ const user = {
 
 console.log(user);
 
-console.log(process.env.SOME_ENV_VARIABLE);
+// console.log(process.env.SOME_ENV_VARIABLE);
